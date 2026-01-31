@@ -153,8 +153,8 @@ export function Sidebar() {
 
         setExpandedCategories(prev =>
             prev.includes(categoryName)
-                ? prev.filter(c => c !== categoryName)
-                : [...prev, categoryName]
+                ? []
+                : [categoryName]
         );
     };
 

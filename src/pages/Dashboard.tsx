@@ -1,20 +1,104 @@
-import { Card, Row, Col } from "react-bootstrap";
+import { useEffect, useState } from "react";
+import { Card, Row, Col, Spinner } from "react-bootstrap";
 import { DollarSign, Package, Users, ShoppingCart } from "lucide-react";
 import { DashboardCharts } from "../components/dashboard/DashboardCharts";
-
-const stats = [
-    { name: "Total Revenue", value: "$45,231.89", icon: DollarSign, color: "text-primary", bg: "bg-primary-subtle" },
-    { name: "Active Orders", value: "23", icon: ShoppingCart, color: "text-success", bg: "bg-success-subtle" },
-    { name: "Products in Stock", value: "1,203", icon: Package, color: "text-warning", bg: "bg-warning-subtle" },
-    { name: "Total Employees", value: "48", icon: Users, color: "text-info", bg: "bg-info-subtle" },
-];
+import { DashboardTables } from "../components/dashboard/DashboardTables";
+import { getPOSOrders, getProducts, getUsers, type POSOrder, type Product } from "../lib/api";
 
 export function Dashboard() {
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({
+        revenue: 0,
+        ordersToday: 0,
+        productsCount: 0,
+        usersCount: 0
+    });
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const [orders, products, users] = await Promise.all([
+                    getPOSOrders(),
+                    getProducts(),
+                    getUsers()
+                ]);
+
+                // Calculate Revenue (Sum of all completed orders)
+                const revenue = orders
+                    .filter(o => o.status === 'COMPLETED')
+                    .reduce((sum, o) => sum + o.total_amount, 0);
+
+                // Calculate Orders Today
+                const today = new Date().toDateString();
+                const ordersToday = orders.filter(o =>
+                    new Date(o.created_at).toDateString() === today
+                ).length;
+
+                setStats({
+                    revenue,
+                    ordersToday,
+                    productsCount: products.length,
+                    usersCount: users.length
+                });
+
+            } catch (error) {
+                console.error("Failed to load dashboard stats", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchStats();
+    }, []);
+
+    const statCards = [
+        {
+            name: "Total Revenue",
+            value: `$${stats.revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+            icon: DollarSign,
+            color: "text-primary",
+            bg: "bg-primary-subtle"
+        },
+        {
+            name: "Orders Today",
+            value: stats.ordersToday.toString(),
+            icon: ShoppingCart,
+            color: "text-success",
+            bg: "bg-success-subtle"
+        },
+        {
+            name: "Total Products",
+            value: stats.productsCount.toString(),
+            icon: Package,
+            color: "text-warning",
+            bg: "bg-warning-subtle"
+        },
+        {
+            name: "System Users",
+            value: stats.usersCount.toString(),
+            icon: Users,
+            color: "text-info",
+            bg: "bg-info-subtle"
+        },
+    ];
+
+    if (loading) {
+        return (
+            <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
+                <Spinner animation="border" variant="primary" />
+            </div>
+        );
+    }
+
     return (
         <div>
-            <h1 className="h2 mb-4">Dashboard Overview</h1>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+                <h1 className="h2 mb-0">Dashboard Overview</h1>
+                <span className="text-muted small">Live Data</span>
+            </div>
+
             <Row className="g-4 mb-4">
-                {stats.map((stat) => (
+                {statCards.map((stat) => (
                     <Col key={stat.name} sm={6} lg={3}>
                         <Card className="border-0 shadow-sm h-100">
                             <Card.Body className="d-flex align-items-center">
@@ -23,7 +107,7 @@ export function Dashboard() {
                                 </div>
                                 <div>
                                     <Card.Text className="text-muted mb-0 small">{stat.name}</Card.Text>
-                                    <Card.Title className="h4 mb-0">{stat.value}</Card.Title>
+                                    <Card.Title className="h4 mb-0 fw-bold">{stat.value}</Card.Title>
                                 </div>
                             </Card.Body>
                         </Card>
@@ -32,6 +116,8 @@ export function Dashboard() {
             </Row>
 
             <DashboardCharts />
+
+            <DashboardTables />
         </div>
     );
 }
